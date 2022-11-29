@@ -1,0 +1,60 @@
+version: "3.6"
+services:
+  api:
+    container_name: touzhele-api
+    build:
+      context: ../
+    environment:
+      HASURA_GRAPHQL_ENDPOINT: http://hasura:8080/v1/graphql
+    volumes:
+      - /Users/user/.aws/config:/root/.aws/config
+      - /Users/user/.aws/credentials:/root/.aws/credentials
+  postgres:
+    container_name: touzhele-postgres
+    image: postgres:12
+    ports:
+      - "5432:5432"
+    volumes:
+      - touzhele_db:/var/lib/postgresql/data
+      - ./postgres/:/docker-entrypoint-initdb.d/
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: password
+  victoria-metrics:
+    container_name: touzhele-victoria-metrics
+    image: victoriametrics/victoria-metrics:latest
+    ports:
+      - "8428:8428"
+      - "8429:8429"
+    volumes:
+      - touzhele_victoria_metrics:/victoria-metrics-data
+      - ./victoria-metrics/:/victoria-metrics-config
+    command:
+      - -promscrape.config
+      - /victoria-metrics-config/prometheus.yaml
+    restart: always
+  debug:
+    container_name: touzhele-debug
+    image: ubuntu:latest
+    command:
+      - /bin/sh
+      - -c
+      - "sleep 99999999"
+    restart: always
+  hasura:
+    container_name: touzhele-hasura
+    image: hasura/graphql-engine:v2.10.1
+    ports:
+      - "8080:8080"
+    depends_on:
+      - "postgres"
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:password@postgres:5432/postgres
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true" # set to "false" to disable console
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+      ## uncomment next line to set an admin secret
+      HASURA_GRAPHQL_ADMIN_SECRET: password
+volumes:
+  touzhele_db:
+  touzhele_victoria_metrics:
